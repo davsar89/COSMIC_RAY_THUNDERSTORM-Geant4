@@ -1,0 +1,16 @@
+FROM ubuntu:jammy
+
+RUN apt-get update -y
+RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get upgrade -y
+RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get install python3 -y
+RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get install python3-pip -y
+RUN pip3 install numpy
+RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get install qtbase5-dev qt5-qmake cmake git curl wget build-essential uuid-runtime uuid-dev libuuid1 qt5-qmake libeigen3-dev -y
+RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get install libboost-filesystem-dev libmotif-dev libxmu-dev libexpat1-dev qtcreator cmake-qt-gui gcc g++ gfortran zlib1g-dev libxerces-c-dev libx11-dev -y
+COPY ./interface/installation_script_Ubuntu_Full_geant4_multithreaded_10.7.bash /installation_script_Ubuntu_Full_geant4_multithreaded_10.7.bash
+RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC bash installation_script_Ubuntu_Full_geant4_multithreaded_10.7.bash
+COPY ./interface/installation_script_linux_only_CADmesh.bash /installation_script_linux_only_CADmesh.bash
+RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC bash installation_script_linux_only_CADmesh.bash
+
+
+

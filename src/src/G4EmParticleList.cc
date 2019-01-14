@@ -22,42 +22,43 @@
 // * use  in  resulting  scientific  publications,  and indicate your *
 // * acceptance of all terms of the Geant4 Software license.          *
 // ********************************************************************
+//
+// $Id: G4EmParticleList 99930 2016-10-11 16:34:52Z gunter $
+//
+//---------------------------------------------------------------------------
+//
+// ClassName:   G4EmParticleList 
+//
+// Author:      V.Ivanchenko 04.05.2017 
+//
+// Modified:
+//
+//----------------------------------------------------------------------------
+//
 
-// E-field that will be set to zero the number of secondaries electrons with a given energy threshold is too high
+#include "G4EmParticleList.hh"
 
-#pragma once
-
-#include "G4Types.hh"
-#include "G4ThreeVector.hh"
-#include "G4ElectricField.hh"
-#include "globals.hh"
-#include "Settings.hh"
-
-
-
-class G4UniformElectricField_timeCut : public G4ElectricField
+G4EmParticleList::G4EmParticleList() 
 {
-    public:  // with description
+  pNames = 
+    { 
+        "gamma",            "e-",           "e+",           "mu+",        "mu-",
+          "pi+",           "pi-",        "kaon+",         "kaon-",     "proton",
+  "anti_proton",         "alpha",          "He3",    "GenericIon",         "B+",
+           "B-",            "D+",           "D-",           "Ds+",        "Ds-",
+     "anti_He3",    "anti_alpha","anti_deuteron","anti_lambda_c+","anti_omega-",
+"anti_sigma_c+","anti_sigma_c++",  "anti_sigma+",   "anti_sigma-","anti_triton",
+   "anti_xi_c+",      "anti_xi-",     "deuteron",     "lambda_c+",     "omega-",
+     "sigma_c+",     "sigma_c++",       "sigma+",        "sigma-",       "tau+",
+         "tau-",        "triton",        "xi_c+",           "xi-"
+    };
+}
 
-        G4UniformElectricField_timeCut(const G4ThreeVector FieldVector);
-        // A field with value equal to FieldVector.
+G4EmParticleList::~G4EmParticleList() 
+{}
 
-        G4UniformElectricField_timeCut(G4double vField,
-                                       G4double vTheta,
-                                       G4double vPhi) ;
+const std::vector<G4String>& G4EmParticleList::PartNames() const
+{
+  return pNames;
+}
 
-        virtual ~G4UniformElectricField_timeCut() ;
-
-        G4UniformElectricField_timeCut(const G4UniformElectricField_timeCut &p);
-        G4UniformElectricField_timeCut &operator = (const G4UniformElectricField_timeCut &p);
-        // Copy constructor and assignment operator
-
-        virtual void GetFieldValue(const G4double pos[4], G4double *field) const;
-
-        virtual G4Field *Clone() const;
-
-    private:
-
-        G4double fFieldComponents[6] ;
-
-};

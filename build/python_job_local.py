@@ -1,87 +1,117 @@
-#!/usr/bin/env python2.7
 import platform
+import subprocess as sp
+import time
+import re
+from os import system
+from os import walk
+import numpy as np
+from os import listdir
 from subprocess import call
 from functools import partial
 from multiprocessing.dummy import Pool
 import numpy as np
-import random
 import time
+import random
 import sys
-from datetime import datetime
-import subprocess as sp
+from random import randint
+from time import sleep
 
 computer_name = platform.node()
 
-#### functions definitions
-
-############################
-
-random.seed(datetime.now())
-seedd = random.randint(1,1000000000)
+def enum(*sequential, **named):
+    enums = dict(zip(sequential, range(len(sequential))), **named)
+    return type('Enum', (), enums)
 
 ################################################################################
-### Defining commands to run
+# Defining commands to run
 
-#efield_altitudes =  [9.,10.,11.,12.,13.,14.]# kilometers, record altitude
+#sleep(randint(1, 5))
 
-efield_altitudes = [12.0]# kilometers, record altitude
+nb_run = 2
 
-scales = [1.5436, 1.9256, 2.4605, 3.2461, 4.4152, 6.0826, 8.3489, 11.4043]
+#POTENTIAL_LIST= [0]
+#POTENTIAL_LIST= [0, 10, 20, 30, 40, 50]
+#POTENTIAL_LIST= [50, 40, 30, 20, 10, 0]
+#POTENTIAL_LIST = [-120, -80, -50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50, 80, 120, -150, 150, -175, 175, -190, 190]
+#POTENTIAL_LIST = [-210, 210, -220, 220]
+POTENTIAL_LIST = [-220, -210, -190, -175, -150, -120, -80, -50, -40, -30, -20, -10, 
+                    0,
+                    10, 20, 30, 40, 50, 80, 120, 150, 175, 190, 210, 220]
+#POTENTIAL_LIST = [-150, 150, -175, 175, -190, 190]
+#POTENTIAL_LIST = [-50, -40, -30, -20, -10]
 
-efield_sizes = [2.0] # does not matter if efield_altitudes > 20
+# if local run
+#if ("iftrom" in computer_name) or ("7370" in computer_name):
+#    POTENTIAL_LIST = [0]
 
-#potential_list = [40., 60., 80. ,100., 120., 140., 160.]
-record_altitudes = [13.0]
-
-# -1 and 1 are used as a proxy of zero field since zero field leads to a not fully understood behaviour.
-#potential_list_0 = np.array([-10.,10.,-30.,30.,-60.,60.,-80.,80.,-100.,100.,-150.,150.,-200.,200.,-300.,300.,-400.,400.]) # will be changed
-#potential_list_0 = potential_list_0[potential_list_0<149.]
-
-tilt_list = np.array([0.]) # does not matter if efield_altitudes > 20
-#tilt_list = np.array([0.,25.,45.])
-
-if ("iftrom" in computer_name) or ("7370" in computer_name) or ("sarria-pc" in computer_name):
-    nb_run = 100
-else :
-    nb_run = 1000
-#potential_list = [200.]
-
-nb_record_to_shoot_per_run = 20000
+#REC_POS_list=           [0]
+REC_POS_list = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8]
+#REC_POS_list = [2]
+#Efield_alt_center=      [16]
+Efield_alt_center_list = [4, 6, 8, 10, 11, 12, 13, 14, 15, 16]
+#Efield_alt_center_list = [10]
+#Efield_alt_center=      [12,  14]
+#Efield_full_size=       [1, 2]
+#Efield_full_size=       [1, 2, 4]
+Efield_full_size_list = [2]
 
 # defining the commands to be run in parallel
-
-commands=[]
-excecutable = './mos_test'
-
-#seedd += 1
+commands = []
+executable = 'timeout 20000s ./mos_test'
 
 for _ in range(nb_run):
-    for size in efield_sizes:
-        for alti_e in efield_altitudes:
-        
-            potential_list_0 = np.array([200.0, 225.])
-            
-            for pot in potential_list_0:
-                for tilt in tilt_list:
-                    commands.append(excecutable + ' ' + str(seedd) + ' ' + str(nb_record_to_shoot_per_run) 
-                                    + ' ' + str(alti_e) + ' ' + str(size) + ' ' + str(pot) + ' ' + str(tilt)
-                                    + ' ' + str(record_altitudes[0]))
-                    seedd+=1
+    for ii, _ in enumerate(Efield_alt_center_list):
+        for jj, _ in enumerate(REC_POS_list):
+            for kk, _ in enumerate(Efield_full_size_list):
+                for POT in POTENTIAL_LIST:
 
-################################################################################
-print(len(commands))
-print(commands[0])
-#############
+                    rec_alt = Efield_alt_center_list[ii] + REC_POS_list[jj]*Efield_full_size_list[kk]/2.0
 
-nb_thread = int(4) # number of threads (cpu) to run
+                    if rec_alt not in [12, 14, 15, 20]:
+                        continue
 
-commands2 = commands
+                    if abs(POT) == 0:
+                        INITIAL_NUMBER_TO_SAMPLE = 1000000
+                    elif abs(POT) == 10:
+                        INITIAL_NUMBER_TO_SAMPLE = 50000
+                    elif abs(POT) == 20:
+                        INITIAL_NUMBER_TO_SAMPLE = 50000
+                    elif abs(POT) == 30:
+                        INITIAL_NUMBER_TO_SAMPLE = 50000
+                    elif abs(POT) == 40:
+                        INITIAL_NUMBER_TO_SAMPLE = 50000
+                    elif abs(POT) == 50:
+                        INITIAL_NUMBER_TO_SAMPLE = 50000
+                    elif abs(POT) == 80:
+                        INITIAL_NUMBER_TO_SAMPLE = 20000
+                    elif abs(POT) == 120:
+                        INITIAL_NUMBER_TO_SAMPLE = 20000
+                    elif abs(POT) > 120:
+                        INITIAL_NUMBER_TO_SAMPLE = 10000
 
-command_number = len(commands2)
+                    commands.append(
+                        executable
+                        + ' ' + str(POT)
+                        + ' ' + str(INITIAL_NUMBER_TO_SAMPLE)
+                        + ' ' + str(REC_POS_list[jj])
+                        + ' ' + str(Efield_alt_center_list[ii])
+                        + ' ' + str(Efield_full_size_list[kk])
+                    )
 
-#print('Number of commands required '+ str(command_number))
+#####################################
 
-pool = Pool(nb_thread) #
-for i, returncode in enumerate(pool.imap(partial(call, shell=True), commands2)):
+random.shuffle(commands)
+
+# LOCAL RUN (uses python multiprocessing library)
+nb_thread = 4  # number of threads (cpu) to run
+
+# Making an array where each element is the list of command for a given thread
+
+command_number = len(commands)
+
+print('Number of commands required ' + str(command_number))
+
+pool = Pool(nb_thread)  # to be always set to 1 for this case
+for i, returncode in enumerate(pool.imap(partial(call, shell=True), commands)):
     if returncode != 0:
         print("%d command failed: %d" % (i, returncode))

@@ -1,304 +1,239 @@
 #include "SteppingAction.hh"
 #include "DetectorConstruction.hh"
-#include "Run.hh"
 #include "EventAction.hh"
 #include "G4RunManager.hh"
-#include "G4SystemOfUnits.hh"
-#include "G4UnitsTable.hh"
-
-
+#include "Run.hh"
 
 // ....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
 
-SteppingAction::SteppingAction(DetectorConstruction *det, EventAction *event)
-    : G4UserSteppingAction(), fDetector(det), fEventAction(event) {}
+SteppingAction::SteppingAction(DetectorConstruction *det, EventAction *event) : G4UserSteppingAction(), fDetector(det), fEventAction(event) {
+
+    if (settings->USE_MAX_TIME) {
+        MAX_TIME = calculate_MAX_TIME(settings->EFIELD_REGION_Y_CENTER,
+                                      settings->EFIELD_REGION_Y_FULL_LENGTH,
+                                      settings->CR_GENERATION_ALT_MAX,
+                                      settings->RECORD_ALTITUDE);
+    }
+
+    G4cout << G4endl;
+
+
+
+}
 
 // ....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
 
-SteppingAction::~SteppingAction() {}
+SteppingAction::~SteppingAction() = default;
 
 // ....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
 
-void SteppingAction::UserSteppingAction(const G4Step *aStep)
-{
+void SteppingAction::UserSteppingAction(const G4Step *aStep) {
     //////// AVOID PUTTING THIS LINE, it will produce incorrect energy record
     //        if (aStep->GetTrack()->GetTrackStatus() != fAlive) return;
     ////////////////////////////////////////////
 
-    if (aStep->GetPreStepPoint()->GetGlobalTime() > 6.0 * second)
-        {
-            aStep->GetTrack()->SetTrackStatus(fStopAndKill);
-            return;
-        }
-
-    if (aStep->GetPreStepPoint()->GetPosition().y() <= 0.0 * km)
-        {
-            aStep->GetTrack()->SetTrackStatus(fStopAndKill);
-            return;
-        }
-
-    if (aStep->GetPreStepPoint()->GetPosition().y() > 120.0 * km)
-        {
-            aStep->GetTrack()->SetTrackStatus(fStopAndKill);
-            return;
-        }
-
-    if (std::abs(aStep->GetPreStepPoint()->GetPosition().x()) > Settings::CR_SAMPLING_XY_HALF_SIZE * km)
-        {
-            aStep->GetTrack()->SetTrackStatus(fStopAndKill);
-            return;
-        }
-
-    if (std::abs(aStep->GetPreStepPoint()->GetPosition().z()) > Settings::CR_SAMPLING_XY_HALF_SIZE * km)
-        {
-            aStep->GetTrack()->SetTrackStatus(fStopAndKill);
-            return;
-        }
-
-    if (std::abs(aStep->GetPreStepPoint()->GetPosition().x()) > Settings::EFIELD_XY_HALF_SIZE * km)
-        {
-            return;
-        }
-
-    if (std::abs(aStep->GetPreStepPoint()->GetPosition().z()) > Settings::EFIELD_XY_HALF_SIZE * km)
-        {
-            return;
-        }
-
-    ///////////////////////
-    const G4int PDG = aStep->GetTrack()->GetParticleDefinition()->GetPDGEncoding();
-    ///////////////////////
-
-    // cleaning low energy particles to improve performance
-    if (aStep->GetPreStepPoint())
-        {
-            // avoid removing positron below threshold to make sure we still have annihilation
-            if (PDG != PDG_posi)
-                {
-                    if (aStep->GetPreStepPoint()->GetKineticEnergy() < 8.0 * keV)
-                        {
-                            aStep->GetTrack()->SetTrackStatus(fStopAndKill);
-                            return;
-                        }
-                }
-        }
-
-    ////////////////////////////
-    // the event execution time can become very long if a particle is stuck.
-    // these lines will kill the stuck particle but not terminate the event
-    if (Settings::USE_WALL_TIME_LIMIT_FOR_EVENT)
-        {
-            part_ID = aStep->GetTrack()->GetTrackID();
-
-            if (part_ID == previous_part_ID)
-                {
-                    double WT = get_wall_time();
-
-                    if (abs(WT - Settings::wall_T_begin_event) > computation_length_for_event_limit)
-                        {
-                            aStep->GetTrack()->SetTrackStatus(fStopAndKill);
-                            Settings::wall_T_begin_event = WT;
-                            return;
-                        }
-                }
-
-            previous_part_ID = part_ID;
-        }
-
-    ////////////////////////////
-
-    if (!(PDG == PDG_elec || PDG == PDG_phot || PDG == PDG_posi))
-        {
-            return;
-        }
-
-    if (Settings::USE_STACKING_ACTION)
-        {
-            if (aStep->GetPreStepPoint())
-                {
-                    if ((Settings::current_efield_status != Settings::OFF) &&
-                        (is_inside_eField_region(aStep->GetPreStepPoint()->GetPosition().y(),
-                                                 aStep->GetPreStepPoint()->GetPosition().x(),
-                                                 aStep->GetPreStepPoint()->GetPosition().z()))
-                       )
-                        {
-                            if (aStep->GetTrack()->GetGlobalTime() > Settings::VARIABLE_TIME_LIMIT)
-                                {
-                                    aStep->GetTrack()->SetTrackStatus(fSuspend);
-                                }
-                        }
-                }
-        }
-
-    ////////////////// PART THAT WAS BEFORE PART OF Sens Det
-
-    const G4int PDG_nb = aStep->GetTrack()->GetParticleDefinition()->GetPDGEncoding();
-
-    //    if (!(PDG_nb == PDG_phot || PDG_nb == PDG_posi || PDG_nb == PDG_elec)) return;
-
+    theTrack = aStep->GetTrack();
     thePrePoint = aStep->GetPreStepPoint();
+    thePostPoint = aStep->GetPostStepPoint();
 
-    const G4double pre_y = aStep->GetPreStepPoint()->GetPosition().y() / km;
-    const G4double post_y = aStep->GetPostStepPoint()->GetPosition().y() / km;
+    ///////////////////////
+    const int PDG_num = theTrack->GetParticleDefinition()->GetPDGEncoding();
+    ///////////////////////
 
-    const G4double rec_alt = Settings::RECORD_ALTITUDES[0];
+//    if (settings->CPU_TIME_LIMIT_PER_EVENT_HAS_BEEN_REACHED) {
+//        theTrack->SetTrackStatus(fStopAndKill);
+//        return;
+//    }
 
-    if ((pre_y >= rec_alt && post_y < rec_alt) || (pre_y <= rec_alt && post_y > rec_alt)) // particle is crossing 20 km layer
-        {
-            //    if (thePrePoint->GetStepStatus() == fGeomBoundary) // if the particle has just entered the volume ; should not be necessary, but won't hurt
-            //        {
-            const G4double ener = thePrePoint->GetKineticEnergy();
-            const G4int ID_part = aStep->GetTrack()->GetTrackID();
-            const G4double momy = thePrePoint->GetMomentumDirection().y();
-
-            // WARNING : PARTICLES ARE ALLOWED TO BE RECORED TWO TIMES IF COMING FROM DIFFERENT DIRECTIONS
-
-            G4int sign_momy = -1;
-
-            if (momy > 0.0)
-                {
-                    sign_momy = 1;
-                }
-            else
-                {
-                    sign_momy = -1;
-                }
-
-            detected_part det_part;
-            det_part.direction = sign_momy;
-            det_part.ID = ID_part;
-
-            if (ener > Settings::ENERGY_MIN && ener < Settings::ENERGY_MAX && is_not_recorded_ID(det_part))
-                //            if (aStep->GetTrack()->GetKineticEnergy() > Settings::ENERGY_MIN)
-                {
-
-                    if (PDG_nb == 22)
-                        {
-                            analysis->fill_histogram_ener(0, ener);
-                            analysis->fill_histogram_momX(0, thePrePoint->GetMomentumDirection().x());
-                            analysis->fill_histogram_momY(0, thePrePoint->GetMomentumDirection().y());
-                            analysis->fill_histogram_momZ(0, thePrePoint->GetMomentumDirection().z());
-                        }
-
-                    if (PDG_nb == 11)
-                        {
-                            analysis->fill_histogram_ener(1, ener);
-                            analysis->fill_histogram_momX(1, thePrePoint->GetMomentumDirection().x());
-                            analysis->fill_histogram_momY(1, thePrePoint->GetMomentumDirection().y());
-                            analysis->fill_histogram_momZ(1, thePrePoint->GetMomentumDirection().z());
-                        }
-
-                    if (PDG_nb == -11)
-                        {
-                            analysis->fill_histogram_ener(2, ener);
-                            analysis->fill_histogram_momX(2, thePrePoint->GetMomentumDirection().x());
-                            analysis->fill_histogram_momY(2, thePrePoint->GetMomentumDirection().y());
-                            analysis->fill_histogram_momZ(2, thePrePoint->GetMomentumDirection().z());
-                        }
-
-                    if (momy > 0.0)
-                        {
-                            if (PDG_nb == 22)
-                                {
-                                    analysis->photon_counter_up++;
-                                }
-                            else if (PDG_nb == 11)
-                                {
-                                    analysis->electron_counter_up++;
-                                }
-                            else if (PDG_nb == -11)
-                                {
-                                    analysis->positron_counter_up++;
-                                }
-                        }
-
-                    if (momy < 0.0)
-                        {
-                            if (PDG_nb == 22)
-                                {
-                                    analysis->photon_counter_down++;
-                                }
-                            else if (PDG_nb == 11)
-                                {
-                                    analysis->electron_counter_down++;
-                                }
-                            else if (PDG_nb == -11)
-                                {
-                                    analysis->positron_counter_down++;
-                                }
-                        }
-
-                    analysis->add_NB_OUTPUT();
+    if (thePrePoint->GetGlobalTime() > settings->MAX_POSSIBLE_TIME) {
+#ifndef NDEBUG
+        G4cout << G4endl << "PARTICLE IS TERMINATED BECAUSE IT EXCEEDED THE TIME LIMIT. " << thePrePoint->GetGlobalTime() / us << G4endl << G4endl;
+#endif // ifndef NDEBUG
+        theTrack->SetTrackStatus(fStopAndKill);
+        return;
+    }
 
 
+    if (thePrePoint->GetPosition().y() < double(settings->SOIL_ALT_MAX * km - 0.1 * km)) {
+        //G4cout << " KILLED BECAUSE REACHED MIN ALTITUDE " << G4endl;
+        theTrack->SetTrackStatus(fStopAndKill);
+        return;
+    }
 
-                    //            analysis->register_particle(aStep->GetTrack()->GetParticleDefinition()->GetPDGEncoding(),
-                    //                                        ID_part,
-                    //                                        thePrePoint->GetPosition().x() / meter,
-                    //                                        thePrePoint->GetPosition().y() / meter,
-                    //                                        thePrePoint->GetPosition().z() / meter,
-                    //                                        thePrePoint->GetMomentumDirection().x(),
-                    //                                        momy,
-                    //                                        thePrePoint->GetMomentumDirection().z(),
-                    //                                        ener / keV,
-                    //                                        thePrePoint->GetGlobalTime() / microsecond,
-                    //                                        RECORD_ALT_IN_KM);
-
-                    RECORDED_LIST.push_back(det_part);
-                }
-
+    if (settings->USE_MAX_TIME) {
+        if (thePrePoint->GetGlobalTime() > MAX_TIME * CLHEP::microsecond && PDG_num!=22) { // keeping photons anyways
+            //G4cout << " KILLED BECAUSE REACHED MAX TIME " << G4endl;
+            theTrack->SetTrackStatus(fStopAndKill);
+            return;
         }
+    }
 
-} // SteppingAction::UserSteppingAction
+    if (thePrePoint->GetPosition().y() > (settings->WORLD_MAX_ALT - 2) * km) {
+        theTrack->SetTrackStatus(fStopAndKill);
+        //G4cout << " KILLED BECAUSE REACHED MAX ALTITUDE " << G4endl;
+        return;
+    }
+
+    const double x_tmp = thePrePoint->GetPosition().x();
+    const double z_tmp = thePrePoint->GetPosition().z();
+    const double radial_dist = sqrt(x_tmp * x_tmp + z_tmp * z_tmp);
+
+    if (radial_dist > settings->RECORD_XZ_HALF_SIZE * km) {
+        //G4cout << " SKIPED BECAUSE OUTSIDE OF HORIZONTAL RECORD DISK " << G4endl;
+        return;
+    }
 
 
-bool SteppingAction::is_inside_eField_region(const G4double &alt, const G4double &xx, const G4double &zz)
-// alt assumed in km
-{
-    if (alt > alt_min && alt < alt_max
-        && abs(xx) < Settings::EFIELD_XY_HALF_SIZE
-        && abs(zz) < Settings::EFIELD_XY_HALF_SIZE)
-        {
-            return true;
+    if (PDG_num == -12 || PDG_num == 12) { // killing if neutrino
+        //G4cout << " KILLED BECAUSE IT IS NEUTRINO " << G4endl;
+        theTrack->SetTrackStatus(fStopAndKill);
+        return;
+    }
+
+    if (PDG_num == 2212 && thePrePoint->GetKineticEnergy() < 50.0 * MeV) {
+        //G4cout << " KILLED BECAUSE IT LOW ENERGY PROTON " << G4endl;
+        theTrack->SetTrackStatus(fStopAndKill);
+        return;
+    }
+
+    // cleaning particles below 8 keV to improve performance
+    if (thePrePoint) {
+        // avoid killing positrons below low energy threshold to make sure we still have annihilation
+
+        if (thePrePoint->GetKineticEnergy() < settings->ENERGY_MIN_RECORD) {
+            if (PDG_num != settings->pdg_posi) {
+                //G4cout << " KILLED BECAUSE BELOW  LOW_ENERGY_THRES" << G4endl;
+                theTrack->SetTrackStatus(fStopAndKill);
+                return;
+            }
+            // using fStopAndAlive for positrons makes a bug that saturates the RAM...
         }
-    else
-        {
-            return false;
+    }
+
+    // skipping the rest if current particle is not photon electron or positron
+    if (!(PDG_num == 22 || PDG_num == 11 || PDG_num == -11)) {
+        //G4cout << " SKIPPED RECORD BECAUSE NOT PHOTON ELECTRON OR POSITRON" << G4endl;
+        return;
+    }
+
+    const int part_index_record = settings->particle_PDG_to_index_mapping[PDG_num];
+
+    /// stacking action check, if pseudo time oriented simulation is activated (slow)
+    if (settings->USE_STACKING_ACTION) {
+        if (thePrePoint) {
+            if (settings->current_efield_status == settings->efield_ON) {
+                if (theTrack->GetGlobalTime() > settings->VARIABLE_TIME_LIMIT_GLOBAL) {
+                    theTrack->SetTrackStatus(fSuspend);
+                    return;
+                }
+            }
         }
+    }
+
+    // check if particle should be recorded
+
+    if (thePrePoint->GetStepStatus() == fGeomBoundary || thePostPoint->GetStepStatus() == fGeomBoundary) {
+
+        const G4String &vol_name = aStep->GetPreStepPoint()->GetTouchableHandle()->GetVolume()->GetName();
+
+        if (vol_name.find("record_phys") != std::string::npos && thePrePoint->GetPosition().y() == settings->RECORD_ALTITUDE * km) {
+
+            const double ener = thePrePoint->GetKineticEnergy() * CLHEP::MeV;
+
+            const double momy = thePrePoint->GetMomentumDirection().y();
+
+            // WARNING : PARTICLES ARE ALLOWED TO BE RECORED 2 TIMES if they cross the detection altitude with upwards and downwards momentum
+
+            if ((ener >= settings->ENERGY_MIN_RECORD) && (ener <= settings->ENERGY_MAX_RECORD)) {
+
+//                if (analysis->check_record(theTrack->GetTrackID(), momy)) {
+
+                analysis->add_NB_OUTPUT();
+
+                const double za = std::acos(momy) * 180.0 / CLHEP::pi;
+
+                const int i_za = find_zenith_angle_index(za, analysis->ZENITH_ANGLE_GRID);
+
+                analysis->fill_histogram_E(part_index_record, i_za, ener / CLHEP::MeV);
+
+                analysis->counter_total[part_index_record] += 1;
+
+                if (momy > 0.0) {
+                    analysis->counter_up[part_index_record] += 1;
+                } else {
+                    analysis->counter_down[part_index_record] += 1;
+                }
+//                }
+            }
+        }
+    }
 }
-
 
 // ------------------------------------------------------------------------
 
-double SteppingAction::get_wall_time()
-// returns time in seconds
+bool SteppingAction::is_inside_eField_region(const double &alt, const double &xx, const double &zz)
+// alt, xx, zz assumed in km
 {
-    struct timeval tv;
-
-    gettimeofday(&tv, NULL);
-    return tv.tv_sec + (tv.tv_usec / 1000000.0);
+    return alt > EFIELD_alt_min && alt < EFIELD_alt_max && std::abs(xx) < settings->EFIELD_XZ_HALF_SIZE && std::abs(zz) < settings->EFIELD_XZ_HALF_SIZE;
 }
 
-
-
-// ....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
-G4bool SteppingAction::is_not_recorded_ID(const detected_part &det_part)
-{
-    return not_contains(det_part, RECORDED_LIST);
-}
-
-// ....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
-G4bool SteppingAction::not_contains(const detected_part &x, const std::vector<detected_part> &v)
-{
-    if (v.empty()) return true;
-
-    for (auto & part : v)
-        {
-            if (part.direction == x.direction && part.ID == x.ID)
-                {
-                    return false;
-                }
+int SteppingAction::find_zenith_angle_index(const double za, const std::vector<double> &vector) {
+    for (uint ii = 0; ii < vector.size() - 1; ++ii) {
+        if (vector[ii] <= za && vector[ii + 1] >= za) {
+            return ii;
         }
+    }
+    G4cout << "ERROR: zenith angle out of possible range. Aborting." << G4endl;
+    std::abort();
+}
 
-    return true;
+// ------------------------------------------------------------------------
+// takes into account twice speed-of-light propagation from emission to record or emission to efield-edge
+// and 5 RREA times or given E-field center density
+// output un MICROSECONDS
+double SteppingAction::calculate_MAX_TIME(const double efield_center,
+                                          const double efield_fullsize,
+                                          const double initial_CR_altitude,
+                                          const double record_altitude) {
+
+
+    // max distance for propagation in atmosphere
+    const double efield_top = efield_center + efield_fullsize / 2.0;
+    const double efield_bottom = efield_center + efield_fullsize / 2.0;
+
+    std::vector<double> distances{settings->CR_GENERATION_ALT_MAX,
+                                  efield_center,
+                                  efield_top,
+                                  efield_bottom,
+                                  record_altitude,
+                                  settings->CR_GENERATION_ALT_MIN,
+    };
+
+    std::vector<double> all_possible_diff{};
+
+    for (const double &dist1 : distances) {
+        for (const double &dist2 : distances) {
+            all_possible_diff.push_back(std::abs(dist1 - dist2));
+        }
+    }
+
+    double max_Dist = 0;
+
+    for (const double &dist : all_possible_diff) {
+        if (dist > max_Dist) {
+            max_Dist = dist;
+        }
+    }
+
+    // max distance for 4 back-and-forth in e-field region
+
+    const double efield_region_lengths = efield_fullsize * 8.0;
+
+    // accumulation of all distances with some margin
+
+    const double max_distance_accumulated = 5.5 * max_Dist + 6.0 * efield_region_lengths; //
+
+    const double c_km_per_us = 0.299792458; // speed of light in km per microsecond
+
+    return max_distance_accumulated / c_km_per_us;
 }

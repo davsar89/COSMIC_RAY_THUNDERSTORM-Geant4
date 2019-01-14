@@ -1,68 +1,72 @@
 #pragma once
 
+#include "AnalysisManager.hh"
+#include "G4ThreeVector.hh"
 #include "G4UserSteppingAction.hh"
+#include "RegionInformation.hh"
 #include "globals.hh"
 #include <vector>
-#include "G4ThreeVector.hh"
-#include "AnalysisManager.hh"
-#include "RegionInformation.hh"
 
-#include <CLHEP/Units/SystemOfUnits.h>
-#include "G4SystemOfUnits.hh"
 #include "G4PhysicalConstants.hh"
+#include "G4SystemOfUnits.hh"
 #include "G4UnitsTable.hh"
+#include <CLHEP/Units/SystemOfUnits.h>
 
 #include "Settings.hh"
 
-#include <time.h>
 #include <sys/time.h>
+#include <time.h>
+#include <vector>
+#include <algorithm>
+#include "myUtils.hh"
 
 class DetectorConstruction;
-class EventAction;
 
-struct detected_part
-{
-    int direction;
-    int ID;
-};
+class EventAction;
 
 // ....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
 
-class SteppingAction: public G4UserSteppingAction
-{
-    public:
-        SteppingAction(DetectorConstruction *, EventAction *);
-        ~SteppingAction();
+struct index_found {
+    uint index;
+    bool found;
+};
 
-        virtual void
-        UserSteppingAction(const G4Step *aStep);
+class SteppingAction : public G4UserSteppingAction {
+public:
 
-    private:
-        AnalysisManager *analysis = AnalysisManager::getInstance();
-        DetectorConstruction *fDetector;
-        EventAction *fEventAction;
-        G4StepPoint *thePrePoint = 0;
+    SteppingAction(DetectorConstruction *, EventAction *);
 
-        const G4int PDG_phot = 22;
-        const G4int PDG_elec = 11;
-        const G4int PDG_posi = -11;
+    ~SteppingAction() override;
 
-        const G4int NB_alt = Settings::RECORD_ALTITUDES.size();
-        double get_wall_time();
+    void UserSteppingAction(const G4Step *aStep) override;
 
-        double computation_length_for_event_limit = 600.; // 10 minutes
+private:
 
-        G4int part_ID;
-        G4int previous_part_ID;
-        G4bool is_not_recorded_ID(const detected_part &det_part);
-        G4bool not_contains(const detected_part &x, const std::vector<detected_part> &v);
+    Settings *settings = Settings::getInstance();
 
-        std::vector<detected_part> RECORDED_LIST;
+    AnalysisManager *analysis = AnalysisManager::getInstance();
+
+    DetectorConstruction *fDetector = nullptr;
+    EventAction *fEventAction = nullptr;
+
+    G4StepPoint *thePrePoint = nullptr;
+    G4StepPoint *thePostPoint = nullptr;
+    G4Track *theTrack = nullptr;
 
 
-        bool is_inside_eField_region(const G4double &alt, const G4double &xx, const G4double &zz);
-        G4double alt_min = Settings::EFIELD_REGION_ALT_CENTER - Settings::EFIELD_REGION_LEN / 2.0; // km
-        G4double alt_max = Settings::EFIELD_REGION_ALT_CENTER + Settings::EFIELD_REGION_LEN / 2.0; // km
+    bool is_inside_eField_region(const G4double &alt,
+                                 const G4double &xx,
+                                 const G4double &zz);
+
+    const double EFIELD_alt_min = settings->EFIELD_REGION_Y_CENTER - settings->EFIELD_REGION_Y_FULL_LENGTH / 2.0; // km
+    const double EFIELD_alt_max = settings->EFIELD_REGION_Y_CENTER + settings->EFIELD_REGION_Y_FULL_LENGTH / 2.0; // km
+    int find_zenith_angle_index(const double za, const std::vector<double> &vector);
+
+    double MAX_TIME=-100; // us
+    double calculate_MAX_TIME(const double efield_center,
+                              const double efield_fullsize,
+                              const double initial_CR_altitude,
+                              const double record_altitude);
 };
 
 // ....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......

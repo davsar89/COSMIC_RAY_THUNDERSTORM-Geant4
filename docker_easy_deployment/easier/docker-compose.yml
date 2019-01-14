@@ -1,0 +1,26 @@
+---
+version: '3'
+services:
+  GEANT4:
+    image: davidsarria/geant4_10_7_3:jammy
+    restart: 'no'
+    container_name: GEANT4
+    volumes:
+      - "./interface:/interface"
+      - "./output:/cluster/work/users/dsarria/SIMULATION_DATAFILES/COSMIC_THUNDER"
+    ports:
+      - "127.0.0.10:8080:8080"
+    # Default command used when running `docker-compose up`
+    command: >
+      bash -c "
+      source /geant4/geant4_install_10.07.p03/bin/geant4.sh
+      && mkdir -p /cluster/work/users/dsarria/SIMULATION_DATAFILES/COSMIC_THUNDER
+      && rm -rf COSMIC_RAY_THUNDERSTORM-Geant4 || true
+      && git clone https://github.com/davsar89/COSMIC_RAY_THUNDERSTORM-Geant4.git || true
+      && cd COSMIC_RAY_THUNDERSTORM-Geant4/build
+      && cmake ../
+      && make -j4
+      && python3 python_job_local.py
+      "
+      
+

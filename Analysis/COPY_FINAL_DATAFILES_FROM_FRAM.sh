@@ -1,0 +1,1 @@
+rsync -avH dsarria@fram.sigma2.no:/cluster/projects/nn9526k/G4_projects/COSMIC_THUNDER/Analysis/*.mat ./
