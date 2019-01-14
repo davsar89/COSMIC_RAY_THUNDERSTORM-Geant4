@@ -1,0 +1,8 @@
+build/CMakeFiles/
+build/mos_test
+build/parma.mod
+*~
+build/CMakeCache.txt
+build/Makefile
+build/cmake_install.cmake
+src/CMakeLists.txt.user

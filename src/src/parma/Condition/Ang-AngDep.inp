@@ -1,0 +1,6 @@
+ 4 0
+s0000-r000-d1033-g020   # ground with 20% water fraction
+s0000-r000-d1033-g-10   # black hole mode
+s0000-r000-d0200-g-01   # ideal atmosphere
+s0000-r000-d0200-p100   # pilot location for 100 ton aircraft
+s0000-r000-d0200-c010   # cabin location for 10 ton aircraft
