@@ -26,4 +26,3 @@ services:
       && python3 python_job_local.py
       "
       
-
