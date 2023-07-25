@@ -198,7 +198,7 @@ $CMake_path \
 -DCMAKE_PREFIX_PATH=${xercesc_install_dir} \
 -DCMAKE_INSTALL_PREFIX=${install_dir} \
 -DCMAKE_BUILD_TYPE=Release \
--DGEANT4_BUILD_MULTITHREADED=ON \
+-DGEANT4_BUILD_MULTITHREADED=OFF \
 -DGEANT4_INSTALL_DATA=ON \
 -DGEANT4_USE_GDML=ON \
 -DGEANT4_USE_G3TOG4=ON \
@@ -282,5 +282,4 @@ echo " " >> ~/.bashrc
 echo "## <-- Added by Geant4 installation script" >> ~/.bashrc
 echo "... Done"
 echo -e "${RED}Please excecute command < ${GREEN}source ~/.bashrc${RED} > or re-open a terminal for the system to be able to find the databases and libraries.${NC}"
-
 
