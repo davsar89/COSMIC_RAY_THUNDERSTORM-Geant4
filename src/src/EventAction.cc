@@ -28,6 +28,8 @@ void EventAction::BeginOfEventAction(const G4Event *) {
         std::time_t end_time = std::chrono::system_clock::to_time_t(end);
         G4cout << "Begin of event : " << settings->NB_EVENT << "; current time: " << std::ctime(&end_time) << G4endl;
     }
+    
+    eventStartTime = std::chrono::steady_clock::now();
 
 //#endif // ifndef NDEBUG
 
