@@ -16,9 +16,6 @@ SteppingAction::SteppingAction(DetectorConstruction *det, EventAction *event) : 
     }
 
     G4cout << G4endl;
-
-
-
 }
 
 // ....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
@@ -39,6 +36,19 @@ void SteppingAction::UserSteppingAction(const G4Step *aStep) {
     ///////////////////////
     const int PDG_num = theTrack->GetParticleDefinition()->GetPDGEncoding();
     ///////////////////////
+
+    // KILL and ABORT EVENT if it takes too long
+    if (settings->MAX_POSSIBLE_EVENT_RUNTIME)
+    {
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration<double>(now - fEventAction->GetEventStartTime()).count();
+        if (elapsed > settings->MAX_POSSIBLE_EVENT_RUNTIME)
+        {
+            G4cout << "Aborting current event after " << elapsed << " seconds (limit = " << settings->MAX_POSSIBLE_TIME << " seconds)." << G4endl;
+            G4EventManager::GetEventManager()->AbortCurrentEvent();
+            return;
+        }
+    }
 
 //    if (settings->CPU_TIME_LIMIT_PER_EVENT_HAS_BEEN_REACHED) {
 //        theTrack->SetTrackStatus(fStopAndKill);
