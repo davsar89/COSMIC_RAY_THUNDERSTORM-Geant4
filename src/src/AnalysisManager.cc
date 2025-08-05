@@ -235,12 +235,8 @@ void AnalysisManager::prepare_output_file_folders() {
     int result = gethostname(hostname, HOST_NAME_MAX);
 
     const G4String hostname_str = G4String(hostname);
-    const G4String to_find = "iftrom";
-
-    bool IS_FRAM = true;
-    if (!(hostname_str.find(to_find) == std::string::npos)) {
-        IS_FRAM = false;
-    }
+    
+    bool IS_FRAM = false;
 
     G4cout << hostname_str << G4endl;
 
@@ -254,7 +250,6 @@ void AnalysisManager::prepare_output_file_folders() {
         }
         settings->MODE = "run";
     } else {
-
         if (settings->pinhole_initial_sampling) {
             BASE_DIR = "./output_PH/";
         } else {
