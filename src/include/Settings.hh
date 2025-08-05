@@ -36,6 +36,8 @@ public:
 
 public:
 
+    const double MAX_POSSIBLE_EVENT_RUNTIME = 30 * 60.0; // 30 minutes
+
     const bool MAKE_EVERYTHING_VACCUM = false; // if true, sets all density to very low value, to be able to check/debug cosmic ray sampling
     G4String MODE = "run";
     //G4String MODE="visu";
