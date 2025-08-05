@@ -4,7 +4,7 @@
 #include "G4UserEventAction.hh"
 #include "Settings.hh"
 #include "globals.hh"
-
+#include <chrono>
 #include <sys/time.h>
 #include <time.h>
 
@@ -23,6 +23,8 @@ public:
 
     void EndOfEventAction(const G4Event *) override;
 
+    const std::chrono::steady_clock::time_point &GetEventStartTime() const { return eventStartTime; }
+    
 private:
 
     Settings *settings = Settings::getInstance();
@@ -30,7 +32,7 @@ private:
     ulong print_nb = 5000; // initialisation
 
     AnalysisManager *analysis = AnalysisManager::getInstance();
-
+    std::chrono::steady_clock::time_point eventStartTime;
 };
 
 // ....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
